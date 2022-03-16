@@ -64,6 +64,16 @@ function lexical_or_syntax_error() {
     exit(ERR_LEX_SYN);
 }
 
+function header_not_first_error() {
+    var_dump("Program met some line before header line");
+    exit(ERR_HEADER);
+}
+
+function double_header_error() {
+    var_dump("Program met second header");
+    exit(ERR_OPERATION_CODE);
+}
+
 function change_str_for_xml($str) {
     if (str_contains($str, "&")) {
         str_replace("&", "&amp;", $str);
@@ -103,7 +113,7 @@ function instruction_to_xml($opcode, $instruction_order, $line_elements_count, $
     echo("\t<instruction order=\"$instruction_order\" opcode=\"$opcode\">\n");
     for ($i = 1; $i <= ($line_elements_count - 1); $i += 1) {
         $arg_info = recognize_type_and_value($split_line[$i]);
-        if ($arg_info["type"] == "string") {
+        if ($arg_info["type"] == "string" || $arg_info["type"] == "var" || $arg_info["type"] == "label") {
             $arg_info["value"] = change_str_for_xml($arg_info["value"]);
         }
         echo("\t\t<arg".$i." type=\"".$arg_info["type"]."\">".$arg_info["value"]."</arg".$i.">\n");
@@ -130,7 +140,7 @@ function recognize_type_and_value($arg) {
         } else {
             $info["type"] = "label";
         }
-        $info["value"] = $lower_arg;
+        $info["value"] = $arg;
     }
     return $info;
 }
@@ -140,12 +150,13 @@ function var_control($arg) {
 }
 
 function int_control($arg) {
-    return preg_match("/(int)@\-?[0-9]+/", $arg);
+    return preg_match("/(int)@(\-|\+)?[0-9]+/", $arg);
 }
 
 function string_control($arg) {
-    return preg_match("/(string)@([a-zA-Z0-9]|(\\0(00|01|02|03|04|05
-|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|32|35|92)))*/", $arg);
+    return preg_match("/^string@([a-zA-Z0-9]|(\\000|\\001|\\002|\\003|\\004|\\005|\\006|\\007|\\008|\\009|\\010
+|\\011|\\012|\\013|\\014|\\015|\\016|\\017|\\018|\\019|\\020|\\021|\\022|\\023|\\024|\\025|\\026
+|\\027|\\028|\\029|\\030|\\031|\\032|\\035|\\092))*/", $arg);
 }
 
 function bool_control($arg) {
@@ -168,6 +179,9 @@ function label_control($arg) {
 }
 
 function type_control($arg) {
+    if (str_contains($arg, "@")) {
+        lexical_or_syntax_error();
+    }
     return preg_match("/(string|int|bool)/", $arg);
 }
 
@@ -178,9 +192,20 @@ function analyze_instructions($line, $instruction_order) {
     $line_elements_count = count($split_line);
     switch ($opcode) {
         case "TYPE":
+        case "NOT":
+        case "STRLEN":
+        case "INT2CHAR":
+            instruction_with_2_args_control($line_elements_count);
+            if (var_control($split_line[1]) && symb_control($split_line[2])) {
+                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
+            } else {
+                lexical_or_syntax_error();
+            }
+            break;
         case "MOVE":
             instruction_with_2_args_control($line_elements_count);
             if (var_control($split_line[1]) && symb_control($split_line[2])) {
+                if (nil_control($split_line[2])) lexical_or_syntax_error();
                 instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
             } else {
                 lexical_or_syntax_error();
@@ -213,6 +238,8 @@ function analyze_instructions($line, $instruction_order) {
             }
             break;
         case "WRITE":
+        case "EXIT":
+        case "DPRINT":
         case "PUSHS":
             instruction_with_1_args_control($line_elements_count);
             if (symb_control($split_line[1])) {
@@ -224,11 +251,24 @@ function analyze_instructions($line, $instruction_order) {
         case "SUB":
         case "MUL":
         case "IDIV":
-        case "JUMPIFEQ":
-        case "JUMPIFNEQ":
+        case "AND":
+        case "OR":
+        case "CONCAT":
+        case "STRI2INT":
+        case "GETCHAR":
+        case "SETCHAR":
         case "ADD":
             instruction_with_3_args_control($line_elements_count);
             if (var_control($split_line[1]) && symb_control($split_line[2]) && symb_control($split_line[3])) {
+                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
+            } else {
+                lexical_or_syntax_error();
+            }
+            break;
+        case "JUMPIFEQ":
+        case "JUMPIFNEQ":
+            instruction_with_3_args_control($line_elements_count);
+            if (label_control($split_line[1]) && symb_control($split_line[2]) && symb_control($split_line[3])) {
                 instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
             } else {
                 lexical_or_syntax_error();
@@ -239,43 +279,9 @@ function analyze_instructions($line, $instruction_order) {
         case "LT":
             instruction_with_3_args_control($line_elements_count);
             if (var_control($split_line[1]) && symb_control($split_line[2]) && symb_control($split_line[3])) {
-                $symb1_info = recognize_type_and_value($split_line[2]);
-                $symb2_info = recognize_type_and_value($split_line[3]);
-                if ($symb1_info["type"] != $symb2_info["type"]) lexical_or_syntax_error();
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "OR":
-        case "AND":
-            instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && bool_control($split_line[2]) && bool_control($split_line[3])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "NOT":
-            instruction_with_2_args_control($line_elements_count);
-            if (var_control($split_line[1]) && bool_control($split_line[2])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "INT2CHAR":
-            instruction_with_2_args_control($line_elements_count);
-            if (var_control($split_line[1]) && int_control($split_line[2])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "GETCHAR":
-        case "STRI2INT":
-            instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && string_control($split_line[2]) && int_control($split_line[3])) {
+//                $symb1_info = recognize_type_and_value($split_line[2]);
+//                $symb2_info = recognize_type_and_value($split_line[3]);
+//                if ($symb1_info["type"] != $symb2_info["type"]) lexical_or_syntax_error();
                 instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
             } else {
                 lexical_or_syntax_error();
@@ -284,39 +290,6 @@ function analyze_instructions($line, $instruction_order) {
         case "READ":
             instruction_with_2_args_control($line_elements_count);
             if (var_control($split_line[1]) && type_control($split_line[2])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "CONCAT":
-            instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && string_control($split_line[2]) && string_control($split_line[3])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "STRLEN":
-            instruction_with_2_args_control($line_elements_count);
-            if (var_control($split_line[1]) && string_control($split_line[2])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "SETCHAR":
-            instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && int_control($split_line[2]) && string_control($split_line[3])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
-        case "DPRINT":
-        case "EXIT":
-            instruction_with_1_args_control($line_elements_count);
-            if (int_control($split_line[1])) {
                 instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
             } else {
                 lexical_or_syntax_error();
@@ -337,9 +310,13 @@ $instruction_order = 1;
 while ($line = fgets(STDIN)) {
     $line = format_line($line);    // odstraneni komentaru
     if ($line == "") continue;   // odstraneni praznych radku
-    if ($line == ".IPPcode22") {
+    if ($line == ".IPPcode22" && $header_bool == false) {
         $header_bool = true;
         continue;
+    } elseif ($header_bool == false) {
+        header_not_first_error();
+    } elseif ($line == ".IPPcode22" && $header_bool == true) {
+        double_header_error();
     }
     if ($header_bool) {
         if($instruction_order == 1) echo("<program language=\"IPPcode22\">\n");
@@ -350,6 +327,10 @@ while ($line = fgets(STDIN)) {
 
 check_start_program($header_bool);
 
-echo("</program>\n");
+if ($instruction_order != 1) {
+    echo("</program>\n");
+} else {
+    echo("<program language=\"IPPcode22\"/>");
+}
 exit(OK);
 ?>
