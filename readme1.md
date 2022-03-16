@@ -7,23 +7,23 @@ Login: xmedve04
 ## Použití
 
 ---
-Program `parse.php` podporuje jeden argument prikazove radky:
+Program `parse.php` podporuje jeden argument přikazové řadky:
 ```
 --help
 ```
-Pri jeho pouziti program vypise strucnou napocedu jak program pouzivat.\
-Pro prace s programem musime pridat nejaky fajl v jazyce `IPPcode22`
+Při jeho použití program vypíše stručnou nápovědu, jak program používat.\
+Pro práci s programem musíme přidat nějaký soubor v jazyce `IPPcode22`
 na `STDIN`.\
-Behem sve prace program vypise reprezentace kodu v `xml` formatu na standartni
-vysput. A ukonci cinnost s `0` navratovem kodem.\
-Jestli nastane chyba, program ukonci cinnost s chybovem kodem podle druhu chyby.
+Během běhu, program vypíše reprezentaci kodu v `xml` formátu na standartní
+výstup. A ukončí činnost s `0` návratovým kódem.\
+Jestli nastane chyba, program ukončí činnost s chybovým kódem podle druhu chyby.
 
 ## Implementace
 
 ---
-Na zacatku program skonroluje spravnost agrumentu prikazove radky.\
-Dal program bude nacitat a spracovyvat vstupni fajl po radku a zacne 
-svou cinnost po podkani radku, ktere ma retezec `.IPPcode22`. \
-Hlavna funkcnost prohazi v funkce - `analyze_instruction`
-, ktera rozdeli line na casti, a provede kontroly podle typu instukce.\
-Jestli to povede uspesne, program vypise instrukce v `xml` formatu.
+Na začátku program zkonroluje správnost agrumentů příkazové řádky.\
+Dál program bude načítat a zpracovávat vstupni soubor po řádku a začne 
+svou činnost po tom, co narazí na řádek, který ma řetězec `.IPPcode22`. \
+Hlavní funkčnost se nachází ve v funkci - `analyze_instruction`
+, která rozdělí line na části a provede kontroly podle typu instukce.\
+Pokud se to povedlo úspěšně, program vypíše instrukce v `xml` formátu.
