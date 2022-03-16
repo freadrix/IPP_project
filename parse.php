@@ -19,7 +19,6 @@ const ERR_INTERN = 99; // interní chyba (neovlivněná vstupními soubory či p
 //----------------------------------------------------------------------------------------------------------------------
 
 ini_set("display_errors", "stderr");
-echo("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
 
 function validate_arguments($argc, $argv){
@@ -162,6 +161,9 @@ function symb_control($arg) {
 }
 
 function label_control($arg) {
+    if (str_contains($arg, "@")) {
+        lexical_or_syntax_error();
+    }
     return preg_match("/[a-zA-Z_\-$&%*!?][a-zA-Z0-9_\-$&%*!?]*/", $arg);
 }
 
@@ -222,9 +224,11 @@ function analyze_instructions($line, $instruction_order) {
         case "SUB":
         case "MUL":
         case "IDIV":
+        case "JUMPIFEQ":
+        case "JUMPIFNEQ":
         case "ADD":
             instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && int_control($split_line[2]) && int_control($split_line[3])) {
+            if (var_control($split_line[1]) && symb_control($split_line[2]) && symb_control($split_line[3])) {
                 instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
             } else {
                 lexical_or_syntax_error();
@@ -309,15 +313,6 @@ function analyze_instructions($line, $instruction_order) {
                 lexical_or_syntax_error();
             }
             break;
-        case "JUMPIFNEQ":
-        case "JUMPIFEQ":
-            instruction_with_3_args_control($line_elements_count);
-            if (var_control($split_line[1]) && symb_control($split_line[2]) && symb_control($split_line[3])) {
-                instruction_to_xml($opcode, $instruction_order, $line_elements_count, $split_line);
-            } else {
-                lexical_or_syntax_error();
-            }
-            break;
         case "DPRINT":
         case "EXIT":
             instruction_with_1_args_control($line_elements_count);
@@ -334,6 +329,7 @@ function analyze_instructions($line, $instruction_order) {
 
 
 validate_arguments($argc, $argv);
+echo("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
 $header_bool = false;
 $instruction_order = 1;
